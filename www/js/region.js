@@ -67,7 +67,89 @@
       .replace(/\$([\d,]+)/g, (m, n) => fmtMoney(parseInt(n.replace(/,/g, ''), 10), region));
   }
 
-  const API = { REGIONS, TERMS, fmtMoney, localize };
+  /* ---------- 북미: 우편번호 → 주(州)/주(province) ---------- */
+  const PLACES = {
+    AL: ['앨라배마', 'Alabama'], AK: ['알래스카', 'Alaska'], AZ: ['애리조나', 'Arizona'], AR: ['아칸소', 'Arkansas'],
+    CA: ['캘리포니아', 'California'], CO: ['콜로라도', 'Colorado'], CT: ['코네티컷', 'Connecticut'], DE: ['델라웨어', 'Delaware'],
+    DC: ['워싱턴 D.C.', 'Washington, D.C.'], FL: ['플로리다', 'Florida'], GA: ['조지아', 'Georgia'], HI: ['하와이', 'Hawaii'],
+    ID: ['아이다호', 'Idaho'], IL: ['일리노이', 'Illinois'], IN: ['인디애나', 'Indiana'], IA: ['아이오와', 'Iowa'],
+    KS: ['캔자스', 'Kansas'], KY: ['켄터키', 'Kentucky'], LA: ['루이지애나', 'Louisiana'], ME: ['메인', 'Maine'],
+    MD: ['메릴랜드', 'Maryland'], MA: ['매사추세츠', 'Massachusetts'], MI: ['미시간', 'Michigan'], MN: ['미네소타', 'Minnesota'],
+    MS: ['미시시피', 'Mississippi'], MO: ['미주리', 'Missouri'], MT: ['몬태나', 'Montana'], NE: ['네브래스카', 'Nebraska'],
+    NV: ['네바다', 'Nevada'], NH: ['뉴햄프셔', 'New Hampshire'], NJ: ['뉴저지', 'New Jersey'], NM: ['뉴멕시코', 'New Mexico'],
+    NY: ['뉴욕', 'New York'], NC: ['노스캐롤라이나', 'North Carolina'], ND: ['노스다코타', 'North Dakota'], OH: ['오하이오', 'Ohio'],
+    OK: ['오클라호마', 'Oklahoma'], OR: ['오리건', 'Oregon'], PA: ['펜실베이니아', 'Pennsylvania'], RI: ['로드아일랜드', 'Rhode Island'],
+    SC: ['사우스캐롤라이나', 'South Carolina'], SD: ['사우스다코타', 'South Dakota'], TN: ['테네시', 'Tennessee'], TX: ['텍사스', 'Texas'],
+    UT: ['유타', 'Utah'], VT: ['버몬트', 'Vermont'], VA: ['버지니아', 'Virginia'], WA: ['워싱턴주', 'Washington'],
+    WV: ['웨스트버지니아', 'West Virginia'], WI: ['위스콘신', 'Wisconsin'], WY: ['와이오밍', 'Wyoming'], PR: ['푸에르토리코', 'Puerto Rico'],
+    // 캐나다
+    BC: ['브리티시컬럼비아', 'British Columbia'], AB: ['앨버타', 'Alberta'], SK: ['서스캐처원', 'Saskatchewan'], MB: ['매니토바', 'Manitoba'],
+    ON: ['온타리오', 'Ontario'], QC: ['퀘벡', 'Quebec'], NB: ['뉴브런즈윅', 'New Brunswick'], NS: ['노바스코샤', 'Nova Scotia'],
+    PE: ['프린스에드워드아일랜드', 'Prince Edward Island'], NL: ['뉴펀들랜드 래브라도', 'Newfoundland and Labrador'],
+    NT: ['노스웨스트 준주·누나부트', 'Northwest Territories / Nunavut'], YT: ['유콘', 'Yukon'],
+  };
+  // 미국 ZIP 앞 3자리 범위 → 주
+  const ZIP3 = [
+    [6, 9, 'PR'], [10, 27, 'MA'], [28, 29, 'RI'], [30, 38, 'NH'], [39, 49, 'ME'], [50, 59, 'VT'], [60, 69, 'CT'],
+    [70, 89, 'NJ'], [5, 5, 'NY'], [100, 149, 'NY'], [150, 196, 'PA'], [197, 199, 'DE'], [200, 200, 'DC'], [201, 201, 'VA'],
+    [202, 205, 'DC'], [206, 219, 'MD'], [220, 246, 'VA'], [247, 268, 'WV'], [270, 289, 'NC'], [290, 299, 'SC'],
+    [300, 319, 'GA'], [398, 399, 'GA'], [320, 349, 'FL'], [350, 369, 'AL'], [370, 385, 'TN'], [386, 397, 'MS'],
+    [400, 427, 'KY'], [430, 459, 'OH'], [460, 479, 'IN'], [480, 499, 'MI'], [500, 528, 'IA'], [530, 549, 'WI'],
+    [550, 567, 'MN'], [569, 569, 'DC'], [570, 577, 'SD'], [580, 588, 'ND'], [590, 599, 'MT'], [600, 629, 'IL'],
+    [630, 658, 'MO'], [660, 679, 'KS'], [680, 693, 'NE'], [700, 714, 'LA'], [716, 729, 'AR'], [733, 733, 'TX'],
+    [730, 749, 'OK'], [750, 799, 'TX'], [885, 885, 'TX'], [800, 816, 'CO'], [820, 831, 'WY'], [832, 838, 'ID'],
+    [840, 847, 'UT'], [850, 865, 'AZ'], [870, 884, 'NM'], [889, 898, 'NV'], [900, 961, 'CA'], [967, 968, 'HI'],
+    [970, 979, 'OR'], [980, 994, 'WA'], [995, 999, 'AK'],
+  ];
+  const CA_POST = { A: 'NL', B: 'NS', C: 'PE', E: 'NB', G: 'QC', H: 'QC', J: 'QC', K: 'ON', L: 'ON', M: 'ON', N: 'ON',
+    P: 'ON', R: 'MB', S: 'SK', T: 'AB', V: 'BC', X: 'NT', Y: 'YT' };
+
+  /* 우편번호 → { code, country } 또는 null. 미국 5자리 ZIP, 캐나다 A1A(1A1) */
+  function placeFromPostal(input) {
+    const s = String(input || '').trim().toUpperCase().replace(/\s+/g, '');
+    if (/^\d{5}(-?\d{4})?$/.test(s)) {
+      const z = parseInt(s.slice(0, 3), 10);
+      const hit = ZIP3.find(r => z >= r[0] && z <= r[1]);
+      return hit ? { code: hit[2], country: 'US', postal: s.slice(0, 5) } : null;
+    }
+    if (/^[A-Z]\d[A-Z](\d[A-Z]\d)?$/.test(s) && CA_POST[s[0]]) return { code: CA_POST[s[0]], country: 'CA', postal: s.slice(0, 3) };
+    return null;
+  }
+  const placeName = (place, lang) => (place && PLACES[place.code] ? PLACES[place.code][lang === 'en' ? 1 : 0] : '');
+
+  /* 총기 구매 규정 (단순화, 2025년 기준 — 법이 자주 바뀌므로 README '확인 필요' 참고)
+   * wait: 신원조회 후 대기 기간, permit: 구매 허가증 필요(발급까지 대략 며칠), none: 대기 없음, banned: 캐나다 권총 신규 구매 동결 */
+  const GUN_LAWS = {
+    CA: { kind: 'wait', days: 10 }, WA: { kind: 'wait', days: 14 }, IL: { kind: 'wait', days: 3 }, FL: { kind: 'wait', days: 3 },
+    CO: { kind: 'wait', days: 3 }, VT: { kind: 'wait', days: 3 }, ME: { kind: 'wait', days: 3 }, NM: { kind: 'wait', days: 7 },
+    RI: { kind: 'wait', days: 7 },
+    HI: { kind: 'permit', days: 14 }, MN: { kind: 'permit', days: 30 }, NJ: { kind: 'permit', days: 30 }, MD: { kind: 'permit', days: 30 },
+    DC: { kind: 'permit', days: 30 }, MA: { kind: 'permit', days: 60 }, CT: { kind: 'permit', days: 60 }, NY: { kind: 'permit', days: 90 },
+  };
+  function gunLaw(place) {
+    if (!place) return { kind: 'wait', days: 10 };          // 우편번호를 건너뛰면 캘리포니아 기준
+    if (place.country === 'CA') return { kind: 'banned', days: 0 };
+    return GUN_LAWS[place.code] || { kind: 'none', days: 0 };
+  }
+
+  /* 그 지역에서 흔한 재난 (선택 화면의 "이 지역 주의" 표시) */
+  const HAZARDS = {
+    kr: ['typhoon', 'heatwave', 'quake'],
+    CA: ['quake', 'wildfire', 'heatwave'], OR: ['quake', 'wildfire'], WA: ['quake', 'wildfire'], AK: ['quake', 'wildfire'],
+    HI: ['typhoon', 'wildfire'], FL: ['typhoon', 'heatwave'], LA: ['typhoon', 'heatwave'], TX: ['typhoon', 'heatwave', 'blackout'],
+    MS: ['typhoon', 'heatwave'], AL: ['typhoon', 'heatwave'], GA: ['typhoon', 'heatwave'], SC: ['typhoon', 'heatwave'],
+    NC: ['typhoon', 'heatwave'], PR: ['typhoon', 'blackout'], AZ: ['heatwave', 'wildfire'], NV: ['heatwave', 'wildfire'],
+    NM: ['heatwave', 'wildfire'], UT: ['heatwave', 'wildfire', 'quake'], CO: ['wildfire'], ID: ['wildfire'], MT: ['wildfire'],
+    WY: ['wildfire'], NY: ['typhoon', 'blackout'], NJ: ['typhoon', 'blackout'], CT: ['typhoon', 'blackout'], MA: ['typhoon', 'blackout'],
+    RI: ['typhoon', 'blackout'], MD: ['typhoon', 'heatwave'], VA: ['typhoon', 'heatwave'], DC: ['heatwave', 'blackout'],
+    BC: ['quake', 'wildfire'], AB: ['wildfire'], SK: ['wildfire'], NS: ['typhoon'], NL: ['typhoon'],
+  };
+  function hazards(region, place) {
+    if (region === 'kr') return HAZARDS.kr;
+    return (place && HAZARDS[place.code]) || ['blackout', 'heatwave'];
+  }
+
+  const API = { REGIONS, TERMS, fmtMoney, localize, PLACES, placeFromPostal, placeName, gunLaw, hazards };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.D7_REGION = API;
 })(typeof window !== 'undefined' ? window : globalThis);

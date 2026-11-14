@@ -209,3 +209,52 @@ test('지역 단위·화폐 변환', () => {
   assert.strictEqual(R.localize('{C:43}, {EMS}, $150', 'na', 'en'), '109°F, 911, $150');
   assert.strictEqual(R.localize('{STORM} {MS:60} {L:4} {M:10}', 'na', 'ko'), '허리케인 134 mph 1갤런 30피트');
 });
+
+test('우편번호 → 주/주(캐나다) 판정', () => {
+  const R = require('../www/js/region.js');
+  const code = z => (R.placeFromPostal(z) || {}).code;
+  assert.strictEqual(code('90210'), 'CA');
+  assert.strictEqual(code('10001'), 'NY');
+  assert.strictEqual(code('33101'), 'FL');
+  assert.strictEqual(code('75201'), 'TX');
+  assert.strictEqual(code('02108'), 'MA');
+  assert.strictEqual(code('v6b 1a1'), 'BC');
+  assert.strictEqual(R.placeFromPostal('M5V').country, 'CA');
+  assert.strictEqual(R.placeFromPostal('1234'), null);
+  assert.strictEqual(R.placeFromPostal('D1A'), null);
+});
+
+test('주마다 다른 총기 규정: 텍사스 즉시, 플로리다 3일, 뉴욕 허가 90일, 캐나다 구매 불가', () => {
+  const R = require('../www/js/region.js');
+  const at = z => D7.newGame('doctor', 'quake', 1, 'na', R.placeFromPostal(z));
+  const cardFor = st => ['na_gun', 'na_gun_now', 'na_gun_permit', 'na_gun_ban'].filter(id => {
+    const c = CARDS.find(x => x.id === id);
+    return c.when.gunLaw.includes(st.gun.kind);
+  });
+  const tx = at('75201');
+  assert.deepStrictEqual(cardFor(tx), ['na_gun_now']);
+  tx.current = CARDS.find(c => c.id === 'na_gun_now'); D7.choose(tx, 'R');
+  assert.ok(tx.items.includes('gun'), 'Texas: same day');
+
+  const fl = at('33101');
+  fl.current = CARDS.find(c => c.id === 'na_gun'); const r = D7.choose(fl, 'R');
+  assert.strictEqual(r.msgs[0].vars.day, 'D-4');
+
+  const ny = at('10001');
+  assert.deepStrictEqual(cardFor(ny), ['na_gun_permit']);
+  ny.current = CARDS.find(c => c.id === 'na_gun_permit'); D7.choose(ny, 'R');
+  assert.strictEqual(ny.pending[0].day, -7 + 90, 'New York permit arrives long after the disaster');
+
+  const bc = at('V6B1A1');
+  assert.strictEqual(bc.gun.kind, 'banned');
+  assert.deepStrictEqual(cardFor(bc), ['na_gun_ban']);
+
+  assert.strictEqual(D7.newGame('doctor', 'quake', 1, 'kr').gun, null, 'Korea: no gun rules');
+});
+
+test('지역별 흔한 재난 표시', () => {
+  const R = require('../www/js/region.js');
+  assert.ok(R.hazards('na', R.placeFromPostal('90210')).includes('quake'));
+  assert.ok(R.hazards('na', R.placeFromPostal('33101')).includes('typhoon'));
+  assert.ok(R.hazards('kr', null).includes('typhoon'));
+});

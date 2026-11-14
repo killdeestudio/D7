@@ -1,0 +1,22 @@
+{
+ "권총은 $650입니다. {STATE} 주법상 신원조회를 하고, {GUN_WAIT}일 대기 기간이 지나야 가져가실 수 있어요.": "The pistol is $650. {STATE} law requires a background check and a {GUN_WAIT}-day waiting period before you can take it home.",
+ "권총은 $650입니다. {STATE}에는 대기 기간이 없어요. 신원조회만 통과하면 오늘 가져가세요.": "The pistol is $650. {STATE} has no waiting period. Pass the background check and it's yours today.",
+ "산다 ($650)": "Buy ($650)",
+ "{STATE}에서는 구매 허가증부터 받으셔야 해요. 보통 {GUN_WAIT}일쯤 걸립니다. 그래도 신청하시겠어요?": "In {STATE} you need a purchase permit first. That usually takes about {GUN_WAIT} days. Still want to apply?",
+ "포기한다": "Forget it",
+ "허가 신청 + 예약 ($650)": "Apply + reserve ($650)",
+ "캐나다는 2022년부터 권총 신규 구매가 동결됐어요. 소총도 면허(PAL)가 없으면 살 수 없고요. 후추 스프레이도 불법이에요.": "Canada froze new handgun sales in 2022. You can't buy a rifle without a PAL licence either. Pepper spray is illegal too.",
+ "그냥 나간다": "Walk out",
+ "곰 퇴치 스프레이 ($60)": "Bear spray ($60)",
+ "총기: 신원조회 후 {n}일 대기": "Firearms: background check + {n}-day wait",
+ "총기: 구매 허가증 필요 (약 {n}일)": "Firearms: purchase permit required (~{n} days)",
+ "총기: 권총 구매 불가 (캐나다)": "Firearms: handgun purchase not allowed (Canada)",
+ "총기: 대기 기간 없음": "Firearms: no waiting period",
+ "알 수 없는 우편번호예요. 미국 5자리 또는 캐나다 A1A 형식으로 넣어주세요.": "Unknown postal code. Enter a 5-digit US ZIP or a Canadian code like A1A.",
+ "이 지역 주의": "Local risk",
+ "어디에 살고 있나요?": "Where do you live?",
+ "우편번호를 넣으면 그 주(州)의 총기 규정과 자주 일어나는 재난이 게임에 반영됩니다. 캐나다는 앞 3자리(예: V6B)만 넣어도 됩니다.": "Enter your postal code and the game uses your state's firearm rules and the disasters common where you live. In Canada the first 3 characters (e.g. V6B) are enough.",
+ "ZIP / 우편번호": "ZIP / Postal code",
+ "이 지역으로 시작": "Start here",
+ "건너뛰기 (캘리포니아 기준)": "Skip (use California)"
+}

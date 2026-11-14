@@ -26,11 +26,12 @@
   }
   function attachRng(st) { st.rng = () => nextRand(st); return st; }
 
+  const regionLib = () => ((typeof module !== 'undefined' && module.exports) ? require('./region.js') : root.D7_REGION);
   const job = id => JOBS.find(j => j.id === id);
   const scen = id => SCENARIOS.find(s => s.id === id);
   const cardById = id => CARDS.find(c => c.id === id) || FILLERS.find(c => c.id === id);
 
-  function newGame(jobId, scenarioId, seed, region) {
+  function newGame(jobId, scenarioId, seed, region, place) {
     const st = attachRng({ rs: (seed == null ? (Date.now() ^ (Math.random() * 1e9)) : seed) >>> 0 });
     const random = scenarioId === 'random' || !scenarioId;
     const sid = random ? SCENARIOS[Math.floor(st.rng() * SCENARIOS.length)].id : scenarioId;
@@ -40,6 +41,8 @@
       v: SAVE_VERSION,
       job: j.id, sc: sid, pickSc: random ? 'random' : sid, revealed: !random,
       region: REGIONS.includes(region) ? region : 'kr', pending: [],
+      place: region === 'na' ? (place || null) : null,
+      gun: region === 'na' ? regionLib().gunLaw(place || null) : null,
       day: -7, slot: 0,
       stats: Object.assign({}, j.stats),
       money: j.money, cash: 0, frozen: 0,
@@ -60,6 +63,7 @@
     const w = c.when || {};
     if (w.phase && w.phase !== phaseOf(st)) return false;
     if (w.region && !w.region.includes(st.region)) return false;
+    if (w.gunLaw && !(st.gun && w.gunLaw.includes(st.gun.kind))) return false;
     if (w.sc && !w.sc.includes(st.sc)) return false;
     if (w.notSc && w.notSc.includes(st.sc)) return false;
     if (w.cashOnly != null && !!scen(st.sc).cashOnly !== w.cashOnly) return false;
@@ -247,10 +251,16 @@
       for (const it of out.del || []) st.items = st.items.filter(x => x !== it);
       for (const f of out.flag || []) { st.flags[f] = true; if (f === 'karma') st.karma++; }
       if (out.deliver) {
-        const due = st.day + out.deliver.days;
-        st.pending.push({ item: out.deliver.item, day: due });
-        st.flags[out.deliver.item + 'Ordered'] = true;
-        res.msgs.push({ t: MSG_ORDERED, vars: { item: out.deliver.item, day: dayLabel(due) } });
+        const days = out.deliver.days === 'law' ? (st.gun ? st.gun.days : 10) : out.deliver.days;
+        const it = out.deliver.item;
+        st.flags[it + 'Ordered'] = true;
+        if (days <= 0) {
+          if (!has(st, it)) { st.items.push(it); res.added.push(it); }
+        } else {
+          const due = st.day + days;
+          st.pending.push({ item: it, day: due });
+          res.msgs.push({ t: MSG_ORDERED, vars: { item: it, day: dayLabel(due) } });
+        }
       }
       if (out.msg) res.msgs.push({ t: out.msg });
       if (out.next && !out.poor) st.queue.push(out.next);

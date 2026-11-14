@@ -37,6 +37,7 @@
             <button class="seg-btn" data-region="kr"></button>
             <button class="seg-btn" data-region="na"></button>
           </div>
+          <p class="place-line" id="place-line"></p>
           <div class="seg">
             <span class="seg-label" data-i18n>효과음</span>
             <button class="seg-btn" id="btn-sound-title"></button>
@@ -60,6 +61,20 @@
           <li data-i18n><b>지역</b>에 따라 기관·화폐·단위와 일부 카드가 달라집니다. 진행 중인 게임은 자동 저장됩니다.</li>
         </ol>
         <button class="btn primary" data-go="s-title" data-i18n>알겠어요</button>
+      </div>
+    </section>
+
+    <!-- 북미: 우편번호 -->
+    <section id="s-zip" class="screen">
+      <div class="page">
+        <h2 data-i18n>어디에 살고 있나요?</h2>
+        <p class="lead" data-i18n>우편번호를 넣으면 그 주(州)의 총기 규정과 자주 일어나는 재난이 게임에 반영됩니다. 캐나다는 앞 3자리(예: V6B)만 넣어도 됩니다.</p>
+        <label class="zip-label" for="zip-input" data-i18n>ZIP / 우편번호</label>
+        <input id="zip-input" class="zip-input" inputmode="text" autocomplete="postal-code" maxlength="10" placeholder="90210">
+        <p class="zip-result" id="zip-result" aria-live="polite"></p>
+        <button class="btn primary" id="btn-zip-ok" data-i18n>이 지역으로 시작</button>
+        <button class="btn ghost" id="btn-zip-skip" data-i18n>건너뛰기 (캘리포니아 기준)</button>
+        <button class="btn ghost" data-go="s-title" data-i18n>뒤로</button>
       </div>
     </section>
 

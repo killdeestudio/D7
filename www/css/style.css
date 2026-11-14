@@ -185,3 +185,16 @@ h2 { margin: 8px 0 4px; font-size: 22px; letter-spacing: -0.02em; }
 .intro .note { margin-top: 8px; color: var(--mute); font-size: 14px; }
 .card.strike { background: #f1c9b8; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 우편번호·지역 */
+.lead { color: #d8d2c6; line-height: 1.6; margin: 0; }
+.zip-label { font-size: 13px; color: var(--mute); margin-top: 6px; }
+.zip-input { font: inherit; font-size: 28px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; text-align: center; padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg2); color: var(--ink); width: 100%; -webkit-user-select: text; user-select: text; }
+.zip-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.zip-result { min-height: 1.6em; margin: 0; font-size: 15px; color: var(--good); line-height: 1.5; }
+.zip-result.bad { color: #f08a7b; }
+.place-line { margin: 0 0 0 82px; font-size: 13px; color: var(--mute); min-height: 0; }
+.place-line:empty { display: none; }
+.tag { display: inline-block; font-size: 11px; font-weight: 700; color: #1a1408; background: var(--accent); border-radius: 999px; padding: 2px 7px; vertical-align: 2px; margin-left: 4px; }
+.ico-svg { width: 1.15em; height: 1.15em; vertical-align: -0.2em; }
+.item .ico-svg { width: 24px; height: 24px; }

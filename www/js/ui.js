@@ -35,14 +35,22 @@
   /* ---------- 번역·현지화 ---------- */
   const t = s => (prefs.lang === 'en' && EN[s] != null ? EN[s] : s);
   const regionNow = () => (st ? st.region : prefs.region);
+  // 게임마다 달라지는 값: {STATE} 사는 주 이름, {GUN_WAIT} 그 주의 총기 대기·허가 일수
+  function gameVars(out) {
+    const place = st ? st.place : (prefs.region === 'na' ? prefs.place : null);
+    const law = st ? st.gun : R.gunLaw(place);
+    return out.split('{STATE}').join(R.placeName(place, prefs.lang) || R.placeName({ code: 'CA' }, prefs.lang))
+      .split('{GUN_WAIT}').join(law ? law.days : 10);
+  }
   function tv(s, vars) {
     let out = t(s);
     for (const k in (vars || {})) out = out.split('{' + k + '}').join(vars[k]);
-    return R.localize(out, regionNow(), prefs.lang);
+    return R.localize(gameVars(out), regionNow(), prefs.lang);
   }
-  const L = s => R.localize(t(s), regionNow(), prefs.lang);
+  const L = s => R.localize(gameVars(t(s)), regionNow(), prefs.lang);
   const money = n => R.fmtMoney(n, regionNow());
-  const itemName = id => ITEMS[id].icon + ' ' + t(ITEMS[id].name);
+  const itemIcon = id => ITEMS[id].svg || ITEMS[id].icon;
+  const itemName = id => itemIcon(id) + ' ' + t(ITEMS[id].name);
   const scenView = s => Object.assign({}, s, s[regionNow()] || {});
   function cardView(c) {
     const o = c[regionNow()] || {};
@@ -72,6 +80,8 @@
     const snd = SFX.enabled ? '🔊' : '🔇';
     $('btn-sound').textContent = snd;
     $('btn-sound-title').textContent = snd + ' ' + (SFX.enabled ? t('켜짐') : t('꺼짐'));
+    const place = prefs.region === 'na' && prefs.place ? prefs.place : null;
+    $('place-line').textContent = place ? '📍 ' + R.placeName(place, prefs.lang) + ' ' + (place.postal || '') : '';
     renderRecords();
     renderResume();
     renderJobs();
@@ -142,7 +152,43 @@
   }
   document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { SFX.play('tap'); show(b.dataset.go); }));
   $('btn-how').addEventListener('click', () => { SFX.play('tap'); show('s-how'); });
-  $('btn-start').addEventListener('click', () => { SFX.play('tap'); st = null; renderJobs(); show('s-job'); });
+  $('btn-start').addEventListener('click', () => {
+    SFX.play('tap'); st = null;
+    if (prefs.region === 'na') { openZip(); return; }
+    renderJobs(); show('s-job');
+  });
+
+  /* ---------- 북미: 우편번호 ---------- */
+  function lawText(law) {
+    if (!law) return '';
+    if (law.kind === 'wait') return tv('총기: 신원조회 후 {n}일 대기', { n: law.days });
+    if (law.kind === 'permit') return tv('총기: 구매 허가증 필요 (약 {n}일)', { n: law.days });
+    if (law.kind === 'banned') return t('총기: 권총 구매 불가 (캐나다)');
+    return t('총기: 대기 기간 없음');
+  }
+  function zipPreview() {
+    const place = R.placeFromPostal($('zip-input').value);
+    const out = $('zip-result');
+    if (!$('zip-input').value.trim()) { out.textContent = ''; return null; }
+    out.classList.toggle('bad', !place);
+    out.textContent = place ? '📍 ' + R.placeName(place, prefs.lang) + ' · ' + lawText(R.gunLaw(place)) : t('알 수 없는 우편번호예요. 미국 5자리 또는 캐나다 A1A 형식으로 넣어주세요.');
+    return place;
+  }
+  function openZip() {
+    $('zip-input').value = prefs.place && prefs.place.postal ? prefs.place.postal : '';
+    zipPreview(); show('s-zip');
+    setTimeout(() => { try { $('zip-input').focus(); } catch (e) { /* 무시 */ } }, 50);
+  }
+  $('zip-input').addEventListener('input', zipPreview);
+  $('zip-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-zip-ok').click(); });
+  $('btn-zip-ok').addEventListener('click', () => {
+    const place = zipPreview();
+    if (!place) { SFX.play('bad'); $('zip-input').focus(); return; }
+    SFX.play('tap'); prefs.place = place; savePrefs(); renderJobs(); show('s-job');
+  });
+  $('btn-zip-skip').addEventListener('click', () => {
+    SFX.play('tap'); prefs.place = { code: 'CA', country: 'US', postal: '' }; savePrefs(); renderJobs(); show('s-job');
+  });
   $('btn-menu').addEventListener('click', () => { saveGame(); st = null; applyStatic(); show('s-title'); toast(t('저장했습니다. 이어하기로 돌아올 수 있어요.')); });
 
   /* ---------- 직업/재난 선택 ---------- */
@@ -152,7 +198,7 @@
         <div class="ic">${j.icon}</div>
         <div class="nm">${t(j.name)} · ${t(j.who)}<small>${money(j.money)}</small></div>
         <div class="bl">${L(j.blurb)}</div>
-        <div class="pc">${j.pros.map(p => `<div class="p">＋ ${L(p)}</div>`).join('')}${j.cons.map(c => `<div class="c">－ ${L(c)}</div>`).join('')}${((j.regionItems || {})[prefs.region] || []).map(i => `<div class="p">＋ ${itemName(i)}</div>`).join('')}</div>
+        <div class="pc">${j.pros.map(p => `<div class="p">＋ ${L(p)}</div>`).join('')}${j.cons.map(c => `<div class="c">－ ${L(c)}</div>`).join('')}${((j.regionItems || {})[prefs.region] || []).filter(i => !(i === 'gun' && prefs.place && prefs.place.country === 'CA')).map(i => `<div class="p">＋ ${itemName(i)}</div>`).join('')}</div>
       </button>`).join('');
     $('job-list').querySelectorAll('.pick').forEach(b => b.addEventListener('click', () => {
       SFX.play('tap'); pick.job = b.dataset.job; renderScenarios(); show('s-sc');
@@ -161,10 +207,11 @@
   function renderScenarios() {
     const rows = [{ id: 'random', icon: '❓', name: '알 수 없음 (추천)', teaser: '무엇이 올지는 D-7 뉴스로 알게 된다. 진짜 재난처럼.', endDay: null }]
       .concat(SCENARIOS.map(scenView));
+    const local = R.hazards(prefs.region, prefs.region === 'na' ? prefs.place : null);
     $('sc-list').innerHTML = rows.map(s => `
       <button class="pick${s.id === 'random' ? ' rec' : ''}" data-sc="${s.id}">
         <div class="ic">${s.icon}</div>
-        <div class="nm">${L(s.name)}${s.endDay ? `<small>${tv('D+{n}까지', { n: s.endDay })}</small>` : ''}</div>
+        <div class="nm"><span>${L(s.name)}${local.includes(s.id) ? ` <span class="tag">${t('이 지역 주의')}</span>` : ''}</span>${s.endDay ? `<small>${tv('D+{n}까지', { n: s.endDay })}</small>` : ''}</div>
         <div class="bl">${L(s.teaser)}</div>
       </button>`).join('');
     $('sc-list').querySelectorAll('.pick').forEach(b => b.addEventListener('click', () => {
@@ -173,7 +220,8 @@
   }
 
   function startIntro() {
-    st = D7.newGame(pick.job, pick.sc, null, prefs.region);
+    st = D7.newGame(pick.job, pick.sc, null, prefs.region, prefs.region === 'na' ? prefs.place : null);
+    if (st.place && st.place.country === 'CA') st.items = st.items.filter(i => i !== 'gun' && i !== 'gunsafe');
     const j = D7.job(st.job), s = scenView(D7.scen(st.sc));
     const news = st.revealed
       ? `<p>📺 <b>${t('속보')}</b> — ${L(s.teaser)}</p>
@@ -185,6 +233,7 @@
       <div class="big">${j.icon}</div>
       <h3>${t(j.who)} · ${t(j.name)}</h3>
       <div class="box"><p>${L(j.blurb)}</p></div>
+      ${st.place ? `<div class="box"><p>📍 <b>${R.placeName(st.place, prefs.lang)}</b> ${st.place.postal || ''}</p><p class="note">${lawText(st.gun)}</p></div>` : ''}
       <div class="box">${news}</div>`;
     show('s-intro');
   }
@@ -226,12 +275,12 @@
     renderItems(added);
   }
   function renderItems(added) {
-    $('items').innerHTML = st.items.map(it => `<button class="item${added && added.includes(it) ? ' new' : ''}" data-it="${it}" aria-label="${t(ITEMS[it].name)}">${ITEMS[it].icon}</button>`).join('');
+    $('items').innerHTML = st.items.map(it => `<button class="item${added && added.includes(it) ? ' new' : ''}" data-it="${it}" aria-label="${t(ITEMS[it].name)}">${itemIcon(it)}</button>`).join('');
     $('items').querySelectorAll('.item').forEach(b => b.addEventListener('click', () => toast(itemName(b.dataset.it))));
   }
   let toastT;
   function toast(text) {
-    const el = $('toast'); el.textContent = text; el.hidden = false;
+    const el = $('toast'); el.innerHTML = text; el.hidden = false;
     el.parentElement.classList.contains('active') || document.querySelector('.screen.active').appendChild(el);
     clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 1800);
   }
@@ -405,7 +454,7 @@
   function ending(res) {
     const j = D7.job(st.job), s = scenView(D7.scen(st.sc));
     const statRow = STATS.map(x => `${x.icon} ${st.stats[x.key]}`).join(' · ');
-    const items = st.items.map(i => ITEMS[i].icon).join(' ') || t('없음');
+    const items = st.items.map(itemIcon).join(' ') || t('없음');
     const tips = `<div class="box"><h4>${tv('실제로 도움이 되는 대비 ({sc})', { sc: L(s.name) })}</h4><ul>${s.tips.map(x => `<li>${L(x)}</li>`).join('')}</ul></div>`;
     let head;
     if (st.won) {
