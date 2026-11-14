@@ -1,6 +1,9 @@
 {
-  "appId": "com.example.d7survival",
-  "appName": "D-7 재난 생존",
+  "appId": "com.d7survival.app",
+  "appName": "D-7",
   "webDir": "www",
-  "backgroundColor": "#121419"
+  "backgroundColor": "#121419",
+  "android": {
+    "backgroundColor": "#121419"
+  }
 }

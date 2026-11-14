@@ -490,7 +490,24 @@
 
   applyStatic();
 
-  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  /* ---------- 앱(안드로이드·iOS) ---------- */
+  const Cap = window.Capacitor;
+  const native = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(); });
+  if (native && Cap.Plugins && Cap.Plugins.App) {
+    const App = Cap.Plugins.App;
+    // 안드로이드 뒤로 가기: 게임 중이면 저장하고 처음 화면으로, 처음 화면이면 앱 종료
+    App.addListener('backButton', () => {
+      const cur = document.querySelector('.screen.active');
+      const id = cur ? cur.id : 's-title';
+      if (id === 's-title') { App.exitApp(); return; }
+      if (id === 's-game') { if (!$('result').hidden) return; $('btn-menu').click(); return; }
+      if (id === 's-sc') { show('s-job'); return; }
+      if (id === 's-intro') { st = null; show('s-sc'); return; }
+      st = null; applyStatic(); show('s-title');
+    });
+    App.addListener('pause', saveGame);
+  } else if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 })();

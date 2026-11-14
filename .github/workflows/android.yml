@@ -1,0 +1,71 @@
+# 안드로이드 앱 빌드: 테스트 → 웹 파일 동기화 → APK(설치용) / AAB(Google Play 업로드용)
+# 결과물은 Actions 실행 화면의 "Artifacts"에서 내려받는다.
+name: Android build
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths: ['www/**', 'android/**', 'tests/**', 'package.json', 'package-lock.json', 'capacitor.config.json', '.github/workflows/android.yml']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install
+        run: npm ci
+
+      - name: Game tests
+        run: npm test
+
+      - name: Copy web files into the Android project
+        run: npx cap sync android
+
+      - name: Build debug APK (install on a phone for testing)
+        working-directory: android
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: d7-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      # 출시용: 저장소 Secrets에 키스토어를 넣었을 때만 실행
+      - name: Build signed release AAB (Google Play)
+        if: ${{ env.KEYSTORE_B64 != '' }}
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/release.jks" ./gradlew bundleRelease --no-daemon
+
+      - name: Upload release AAB
+        if: ${{ env.KEYSTORE_B64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: d7-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab

@@ -100,30 +100,63 @@ npm start
 
 한 번 열면 오프라인에서도 실행됩니다 (서비스 워커 캐시).
 
-## 스토어 앱으로 만들기 (Capacitor)
+## 안드로이드 앱
+
+`android/` 폴더가 Capacitor로 만든 안드로이드 프로젝트입니다 (앱 ID `com.d7survival.app`, 세로 고정, 최소 Android 7.0 / 대상 SDK 36).
+
+### 1. 컴퓨터 없이 APK 받기 (GitHub Actions)
+
+이 저장소에 푸시하면 GitHub가 자동으로 앱을 빌드합니다 (`.github/workflows/android.yml`).
+
+1. GitHub 저장소 → **Actions** → **Android build** → 가장 최근 실행을 엽니다. (직접 돌리려면 **Run workflow**)
+2. 아래 **Artifacts**에서 `d7-debug-apk`를 내려받아 압축을 풉니다 → `app-debug.apk`
+3. 안드로이드 폰으로 옮겨서 열기 → "출처를 알 수 없는 앱 설치"를 허용하면 설치됩니다.
+
+디버그 APK는 테스트용입니다. Google Play에는 아래 서명된 AAB를 올립니다.
+
+### 2. Google Play 출시용 (서명된 AAB)
+
+1. 업로드 키 만들기 (한 번만, 잃어버리면 안 됨 — 안전한 곳에 백업):
+
+```bash
+keytool -genkeypair -v -keystore d7-upload.jks -alias d7 -keyalg RSA -keysize 2048 -validity 10000
+```
+
+2. GitHub 저장소 → Settings → Secrets and variables → Actions 에 4개 등록:
+   - `ANDROID_KEYSTORE_BASE64`: `base64 -w0 d7-upload.jks` 결과
+   - `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`(`d7`), `ANDROID_KEY_PASSWORD`
+3. 다시 빌드하면 Artifacts에 `d7-release-aab`가 생깁니다 → Google Play Console에 업로드.
+   - 빌드 번호(versionCode)는 Actions 실행 번호로 자동 증가합니다.
+   - Play Console: 개발자 등록 $25(1회), 앱 만들기 → 내부 테스트 트랙에 AAB 업로드 → 테스터 초대로 먼저 확인 추천.
+   - 새 개인 개발자 계정은 출시 전 테스터 12명 × 14일 비공개 테스트가 필요할 수 있습니다.
+
+키스토어 파일(`*.jks`)은 저장소에 절대 커밋하지 마세요 (`.gitignore`에 포함).
+
+### 3. 내 컴퓨터에서 빌드 (선택)
+
+Android Studio를 설치한 뒤:
 
 ```bash
 npm install
 ```
 
 ```bash
-npm run cap:add:android
+npm run android:apk
 ```
 
-```bash
-npm run cap:add:ios
-```
+또는 `npx cap open android`로 Android Studio에서 열어 폰을 USB로 연결하고 ▶ 실행.
 
-게임 파일을 고친 뒤에는 매번:
+웹 파일(`www/`)을 고친 뒤에는 항상 `npx cap sync android`로 복사해야 앱에 반영됩니다. 아이콘을 바꾸려면 `assets/`의 이미지를 교체하고 `npm run android:icons`.
 
-```bash
-npm run cap:sync
-```
+### 앱에서만 다른 점
 
-- **Android**: `npm run cap:android` → Android Studio에서 빌드 → Google Play Console 업로드 (개발자 등록 $25, 1회)
-- **iOS**: `npm run cap:ios` → Xcode에서 빌드 → App Store Connect 업로드 (Mac + Apple Developer $99/년 필요)
-- 출시 전 `capacitor.config.json`의 `appId`(`com.example.d7survival`)를 본인 도메인 기반으로 바꾸세요.
-- 스토어용 1024px 아이콘: `www/icons/icon-1024.png`
+- 안드로이드 **뒤로 가기**: 게임 중이면 저장하고 첫 화면으로, 첫 화면이면 앱 종료
+- 앱이 백그라운드로 가면 자동 저장
+- 오프라인 캐시(서비스 워커)는 쓰지 않음 — 파일이 앱 안에 들어 있어 항상 오프라인 동작
+
+## iOS 앱
+
+`npx cap add ios` 후 `npx cap open ios`로 Xcode에서 빌드합니다. Mac과 Apple Developer 계정(연 $99)이 필요합니다.
 
 ## 개발
 

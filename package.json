@@ -12,14 +12,18 @@
     "cap:add:ios": "npx cap add ios",
     "cap:sync": "npx cap sync",
     "cap:android": "npx cap open android",
-    "cap:ios": "npx cap open ios"
+    "cap:ios": "npx cap open ios",
+    "android:icons": "npx capacitor-assets generate --android --iconBackgroundColor '#121419' --splashBackgroundColor '#121419'",
+    "android:apk": "npx cap sync android && cd android && ./gradlew assembleDebug"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.1.2"
+    "@capacitor/cli": "8.6.2",
+    "@capacitor/assets": "4.0.0"
   },
   "dependencies": {
-    "@capacitor/android": "^6.1.2",
-    "@capacitor/core": "^6.1.2",
-    "@capacitor/ios": "^6.1.2"
+    "@capacitor/android": "8.6.2",
+    "@capacitor/core": "8.6.2",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/ios": "8.6.2"
   }
 }

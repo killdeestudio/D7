@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">D-7 Survival</string>
+    <string name="title_activity_main">D-7 Survival</string>
+    <string name="package_name">com.d7survival.app</string>
+    <string name="custom_url_scheme">com.d7survival.app</string>
+</resources>
