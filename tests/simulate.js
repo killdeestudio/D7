@@ -24,7 +24,7 @@ function smartPick(st) {
 }
 
 function run(jobId, scId, strategy, seed) {
-  const st = D7.newGame(jobId, scId, seed);
+  const st = D7.newGame(jobId, scId, seed, process.env.REGION || 'kr');
   let guard = 0;
   while (!st.over && guard++ < 500) {
     D7.drawCard(st);

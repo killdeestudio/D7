@@ -1,107 +1,206 @@
-/* D-7 재난 생존 — 화면 */
+/* D-7 재난 생존 — 화면
+ * 모든 화면 문구는 t('한국어 원문')으로 쓴다. 영어는 i18n-en.js 사전에서 찾는다.
+ * 지역(대한민국/북미)은 region.js가 기관 이름·단위·화폐를 바꾼다.
+ */
 (function () {
   'use strict';
   const { STATS, JOBS, SCENARIOS, DEATHS, ITEMS } = window.D7_DATA;
   const D7 = window.D7;
+  const R = window.D7_REGION;
+  const EN = window.D7_EN || {};
+  const SFX = window.D7Sound || { play() {}, toggle() { return false; }, unlock() {}, enabled: false };
   const $ = id => document.getElementById(id);
-  const money = n => '$' + Math.round(n).toLocaleString('en-US');
   const STORE = 'd7-records-v1';
+  const SAVE = 'd7-save-v2';
+  const PREFS = 'd7-prefs-v1';
 
-  let st = null;          // 현재 게임 상태
+  /* ---------- 저장소 (실패해도 게임은 진행) ---------- */
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } },
+    del(k) { try { localStorage.removeItem(k); } catch (e) { /* 무시 */ } },
+  };
+
+  let prefs = (() => {
+    try { const p = JSON.parse(store.get(PREFS)); if (p && p.lang && p.region) return p; } catch (e) { /* 무시 */ }
+    const ko = /^ko/i.test(navigator.language || '');
+    return { lang: ko ? 'ko' : 'en', region: ko ? 'kr' : 'na' };
+  })();
+
+  let st = null;
   let pick = { job: null, sc: 'random' };
-  let armed = null;       // 버튼 1차 탭(미리보기) 상태
+  let armed = null;
   let busy = false;
 
-  /* ---------- 저장 (실패해도 게임은 진행) ---------- */
+  /* ---------- 번역·현지화 ---------- */
+  const t = s => (prefs.lang === 'en' && EN[s] != null ? EN[s] : s);
+  const regionNow = () => (st ? st.region : prefs.region);
+  function tv(s, vars) {
+    let out = t(s);
+    for (const k in (vars || {})) out = out.split('{' + k + '}').join(vars[k]);
+    return R.localize(out, regionNow(), prefs.lang);
+  }
+  const L = s => R.localize(t(s), regionNow(), prefs.lang);
+  const money = n => R.fmtMoney(n, regionNow());
+  const itemName = id => ITEMS[id].icon + ' ' + t(ITEMS[id].name);
+  const scenView = s => Object.assign({}, s, s[regionNow()] || {});
+  function cardView(c) {
+    const o = c[regionNow()] || {};
+    return {
+      who: o.who || c.who, text: o.text || c.text,
+      L: (o.L && o.L.t) || c.L.t, R: (o.R && o.R.t) || c.R.t,
+    };
+  }
+  function msgText(m) {
+    const vars = Object.assign({}, m.vars);
+    if (vars.item) vars.item = itemName(vars.item);
+    return tv(m.t, vars);
+  }
+
+  function applyStatic() {
+    document.documentElement.lang = prefs.lang;
+    document.title = t('D-7 재난 생존');
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      if (el.dataset.ko == null) el.dataset.ko = el.innerHTML.trim();
+      el.innerHTML = L(el.dataset.ko);
+    });
+    document.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('on', b.dataset.lang === prefs.lang));
+    document.querySelectorAll('[data-region]').forEach(b => {
+      b.textContent = R.REGIONS[b.dataset.region].flag + ' ' + t(R.REGIONS[b.dataset.region].name);
+      b.classList.toggle('on', b.dataset.region === prefs.region);
+    });
+    const snd = SFX.enabled ? '🔊' : '🔇';
+    $('btn-sound').textContent = snd;
+    $('btn-sound-title').textContent = snd + ' ' + (SFX.enabled ? t('켜짐') : t('꺼짐'));
+    renderRecords();
+    renderResume();
+    renderJobs();
+  }
+  function savePrefs() { store.set(PREFS, JSON.stringify(prefs)); applyStatic(); }
+  document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => { prefs.lang = b.dataset.lang; SFX.play('tap'); savePrefs(); }));
+  document.querySelectorAll('[data-region]').forEach(b => b.addEventListener('click', () => { prefs.region = b.dataset.region; SFX.play('tap'); savePrefs(); }));
+  const toggleSound = () => { SFX.toggle(); applyStatic(); };
+  $('btn-sound-title').addEventListener('click', toggleSound);
+  $('btn-sound').addEventListener('click', toggleSound);
+  document.addEventListener('pointerdown', () => SFX.unlock(), { once: true });
+
+  /* ---------- 기록 ---------- */
   function loadRecords() {
-    try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; }
+    try { return JSON.parse(store.get(STORE)) || {}; } catch (e) { return {}; }
   }
   function saveRecord(s) {
-    try {
-      const r = loadRecords();
-      const key = s.job;
-      const prev = r[key] || { plays: 0, wins: 0, best: null };
-      prev.plays++;
-      if (s.won) {
-        prev.wins++;
-        const sc = D7.score(s);
-        if (!prev.best || sc > prev.best.score) prev.best = { score: sc, grade: D7.grade(s), sc: s.sc };
-      }
-      r[key] = prev;
-      localStorage.setItem(STORE, JSON.stringify(r));
-    } catch (e) { /* 무시 */ }
+    const r = loadRecords();
+    const prev = r[s.job] || { plays: 0, wins: 0, best: null };
+    prev.plays++;
+    if (s.won) {
+      prev.wins++;
+      const sc = D7.score(s);
+      if (!prev.best || sc > prev.best.score) prev.best = { score: sc, grade: D7.grade(s), sc: s.sc };
+    }
+    r[s.job] = prev;
+    store.set(STORE, JSON.stringify(r));
   }
   function renderRecords() {
     const r = loadRecords();
     const lines = JOBS.filter(j => r[j.id]).map(j => {
       const x = r[j.id];
-      return `${j.icon} ${j.name} ${x.wins}/${x.plays} 생존${x.best ? ' · 최고 ' + x.best.grade : ''}`;
+      return `${j.icon} ${t(j.name)} ${tv('{w}/{p} 생존', { w: x.wins, p: x.plays })}${x.best ? ' · ' + tv('최고 {g}', { g: x.best.grade }) : ''}`;
     });
-    $('records').innerHTML = lines.length ? '<b>내 기록</b><br>' + lines.join('<br>') : '';
+    $('records').innerHTML = lines.length ? '<b>' + t('내 기록') + '</b><br>' + lines.join('<br>') : '';
   }
+
+  /* ---------- 이어하기 ---------- */
+  const saveGame = () => { if (st && !st.over) store.set(SAVE, D7.serialize(st)); };
+  const clearSave = () => store.del(SAVE);
+  function loadSave() {
+    const raw = store.get(SAVE);
+    if (!raw) return null;
+    try { return D7.restore(raw); } catch (e) { return null; }
+  }
+  function renderResume() {
+    const s = loadSave();
+    const b = $('btn-resume');
+    b.hidden = !s;
+    if (s) {
+      const j = D7.job(s.job);
+      b.textContent = `${t('이어하기')} · ${j.icon} ${t(j.who)} · ${D7.dayLabel(s.day)}`;
+    }
+  }
+  $('btn-resume').addEventListener('click', () => {
+    const s = loadSave();
+    if (!s) { renderResume(); return; }
+    st = s;
+    pick = { job: s.job, sc: s.pickSc || s.sc };
+    buildHud(); show('s-game');
+    if (st.current) renderCard(st.current); else nextCard();
+  });
 
   /* ---------- 화면 전환 ---------- */
   function show(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
-    if (id === 's-title') renderRecords();
+    if (id === 's-title') { renderRecords(); renderResume(); }
   }
-  document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => show(b.dataset.go)));
-  $('btn-how').addEventListener('click', () => show('s-how'));
+  document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { SFX.play('tap'); show(b.dataset.go); }));
+  $('btn-how').addEventListener('click', () => { SFX.play('tap'); show('s-how'); });
+  $('btn-start').addEventListener('click', () => { SFX.play('tap'); st = null; renderJobs(); show('s-job'); });
+  $('btn-menu').addEventListener('click', () => { saveGame(); st = null; applyStatic(); show('s-title'); toast(t('저장했습니다. 이어하기로 돌아올 수 있어요.')); });
 
   /* ---------- 직업/재난 선택 ---------- */
   function renderJobs() {
     $('job-list').innerHTML = JOBS.map(j => `
       <button class="pick" data-job="${j.id}">
         <div class="ic">${j.icon}</div>
-        <div class="nm">${j.name} · ${j.who}<small>${money(j.money)}</small></div>
-        <div class="bl">${j.blurb}</div>
-        <div class="pc">${j.pros.map(p => `<div class="p">＋ ${p}</div>`).join('')}${j.cons.map(c => `<div class="c">－ ${c}</div>`).join('')}</div>
+        <div class="nm">${t(j.name)} · ${t(j.who)}<small>${money(j.money)}</small></div>
+        <div class="bl">${L(j.blurb)}</div>
+        <div class="pc">${j.pros.map(p => `<div class="p">＋ ${L(p)}</div>`).join('')}${j.cons.map(c => `<div class="c">－ ${L(c)}</div>`).join('')}${((j.regionItems || {})[prefs.region] || []).map(i => `<div class="p">＋ ${itemName(i)}</div>`).join('')}</div>
       </button>`).join('');
     $('job-list').querySelectorAll('.pick').forEach(b => b.addEventListener('click', () => {
-      pick.job = b.dataset.job; renderScenarios(); show('s-sc');
+      SFX.play('tap'); pick.job = b.dataset.job; renderScenarios(); show('s-sc');
     }));
   }
   function renderScenarios() {
     const rows = [{ id: 'random', icon: '❓', name: '알 수 없음 (추천)', teaser: '무엇이 올지는 D-7 뉴스로 알게 된다. 진짜 재난처럼.', endDay: null }]
-      .concat(SCENARIOS);
+      .concat(SCENARIOS.map(scenView));
     $('sc-list').innerHTML = rows.map(s => `
       <button class="pick${s.id === 'random' ? ' rec' : ''}" data-sc="${s.id}">
         <div class="ic">${s.icon}</div>
-        <div class="nm">${s.name}${s.endDay ? `<small>D+${s.endDay}까지</small>` : ''}</div>
-        <div class="bl">${s.teaser}</div>
+        <div class="nm">${L(s.name)}${s.endDay ? `<small>${tv('D+{n}까지', { n: s.endDay })}</small>` : ''}</div>
+        <div class="bl">${L(s.teaser)}</div>
       </button>`).join('');
     $('sc-list').querySelectorAll('.pick').forEach(b => b.addEventListener('click', () => {
-      pick.sc = b.dataset.sc; startIntro();
+      SFX.play('tap'); pick.sc = b.dataset.sc; startIntro();
     }));
   }
 
   function startIntro() {
-    st = D7.newGame(pick.job, pick.sc);
-    const j = D7.job(st.job), s = D7.scen(st.sc);
+    st = D7.newGame(pick.job, pick.sc, null, prefs.region);
+    const j = D7.job(st.job), s = scenView(D7.scen(st.sc));
+    const news = st.revealed
+      ? `<p>📺 <b>${t('속보')}</b> — ${L(s.teaser)}</p>
+         <p class="note">${tv('재난까지 7일. 가진 돈 {money}.', { money: money(st.money) })}
+         ${s.cashOnly ? t('재난이 오면 카드·계좌가 막힐 수 있다.') : ''} ${tv('상황은 <b>D+{n}</b>쯤 끝난다고 한다.', { n: s.endDay })}</p>`
+      : `<p>📺 <b>${t('속보')}</b> — ${t('무언가 다가오고 있다. 아직 무엇인지는 모른다.')}</p>
+         <p class="note">${tv('재난까지 7일. 가진 돈 {money}.', { money: money(st.money) })} ${t('카드가 막힐 수 있으니 현금도 생각해두자.')}</p>`;
     $('intro-body').innerHTML = `
       <div class="big">${j.icon}</div>
-      <h3>${j.who} · ${j.name}</h3>
-      <div class="box"><p>${j.blurb}</p></div>
-      <div class="box"><p>📺 <b>속보</b> — ${s.teaser}</p>
-        <p style="margin-top:8px;color:var(--mute);font-size:14px">재난까지 7일. 가진 돈 ${money(st.money)}.
-        ${s.cashOnly ? '재난이 오면 카드·계좌가 막힐 수 있다.' : ''} 상황은 <b>D+${s.endDay}</b>쯤 끝난다고 한다.</p></div>`;
+      <h3>${t(j.who)} · ${t(j.name)}</h3>
+      <div class="box"><p>${L(j.blurb)}</p></div>
+      <div class="box">${news}</div>`;
     show('s-intro');
   }
-  $('btn-begin').addEventListener('click', () => { buildHud(); show('s-game'); nextCard(); });
+  $('btn-begin').addEventListener('click', () => { SFX.play('tap'); buildHud(); show('s-game'); nextCard(); });
 
   /* ---------- HUD ---------- */
   function buildHud() {
     $('stats').innerHTML = STATS.map(s => `
-      <div class="stat" id="st-${s.key}" title="${s.name}">
+      <div class="stat" id="st-${s.key}" title="${t(s.name)}">
         <div class="fill"></div><span class="ico">${s.icon}</span><span class="val"></span><span class="dot"></span>
       </div>`).join('');
-    const j = D7.job(st.job), s = D7.scen(st.sc);
-    $('me').textContent = `${j.icon} ${j.who}`;
-    const span = 7 + s.endDay;
-    $('tl-dday').style.left = (7 / span * 100) + '%';
+    const j = D7.job(st.job);
+    $('me').textContent = `${j.icon} ${t(j.who)}`;
     renderHud();
   }
-  function renderHud(delta) {
+  function renderHud(delta, added) {
     for (const s of STATS) {
       const el = $('st-' + s.key), v = st.stats[s.key];
       el.querySelector('.fill').style.height = v + '%';
@@ -112,43 +211,52 @@
         el.classList.add(delta[s.key] > 0 ? 'flash-up' : 'flash-down');
       }
     }
-    const s = D7.scen(st.sc);
+    const s = scenView(D7.scen(st.sc));
     const pre = st.day < 0;
-    $('day').innerHTML = `${D7.dayLabel(st.day)}<small>${pre ? s.short + ' 경보' : s.short + ' · D+' + s.endDay + '까지'}</small>`;
+    const sub = !st.revealed ? t('정체불명의 경보')
+      : pre ? tv('{sc} 경보', { sc: L(s.short) }) : tv('{sc} · D+{n}까지', { sc: L(s.short), n: s.endDay });
+    $('day').innerHTML = `${D7.dayLabel(st.day)}<small>${sub}</small>`;
     $('money').innerHTML = pre
-      ? `자산 <b>${money(st.money)}</b><br>현금 ${money(st.cash)}`
-      : `${s.cashOnly ? '현금' : '자금'} <b>${money(st.money)}</b>${st.frozen > 0 ? `<br>동결 ${money(st.frozen)}` : ''}`;
-    const span = 7 + s.endDay, done = st.day + 7 + st.slot / D7.perDay(st);
+      ? `${t('자산')} <b>${money(st.money)}</b><br>${t('현금')} ${money(st.cash)}`
+      : `${s.cashOnly ? t('현금') : t('자금')} <b>${money(st.money)}</b>${st.frozen > 0 ? `<br>${t('동결')} ${money(st.frozen)}` : ''}`;
+    const span = 7 + (st.revealed ? s.endDay : 14);
+    $('tl-dday').style.left = (7 / span * 100) + '%';
+    const done = st.day + 7 + st.slot / D7.perDay(st);
     $('tl-fill').style.width = Math.min(100, done / span * 100) + '%';
-    renderItems();
+    renderItems(added);
   }
   function renderItems(added) {
-    $('items').innerHTML = st.items.map(it => {
-      const I = ITEMS[it];
-      return `<button class="item${added && added.includes(it) ? ' new' : ''}" data-it="${it}" aria-label="${I.name}">${I.icon}</button>`;
-    }).join('');
-    $('items').querySelectorAll('.item').forEach(b => b.addEventListener('click', () => toast(ITEMS[b.dataset.it].icon + ' ' + ITEMS[b.dataset.it].name)));
+    $('items').innerHTML = st.items.map(it => `<button class="item${added && added.includes(it) ? ' new' : ''}" data-it="${it}" aria-label="${t(ITEMS[it].name)}">${ITEMS[it].icon}</button>`).join('');
+    $('items').querySelectorAll('.item').forEach(b => b.addEventListener('click', () => toast(itemName(b.dataset.it))));
   }
   let toastT;
-  function toast(t) {
-    const el = $('toast'); el.textContent = t; el.hidden = false;
-    clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 1600);
+  function toast(text) {
+    const el = $('toast'); el.textContent = text; el.hidden = false;
+    el.parentElement.classList.contains('active') || document.querySelector('.screen.active').appendChild(el);
+    clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 1800);
   }
 
   /* ---------- 카드 ---------- */
   const card = $('card');
-  function nextCard() {
-    armed = null; busy = false;
-    const c = D7.drawCard(st);
-    renderHud();
-    $('prompt').textContent = c.text;
-    $('portrait').textContent = c.who[0];
-    $('who').textContent = c.who[1];
-    $('btn-L').textContent = '← ' + c.L.t;
-    $('btn-R').textContent = c.R.t + ' →';
+  function disarm() {
+    armed = null;
     $('btn-L').classList.remove('armed'); $('btn-R').classList.remove('armed');
+  }
+  function nextCard() {
+    renderCard(D7.drawCard(st));
+    saveGame();
+  }
+  function renderCard(c) {
+    disarm(); busy = false;
+    const v = cardView(c);
+    renderHud();
+    $('prompt').textContent = L(v.text);
+    $('portrait').textContent = v.who[0];
+    $('who').textContent = L(v.who[1]);
+    $('btn-L').textContent = '← ' + L(v.L);
+    $('btn-R').textContent = L(v.R) + ' →';
     $('btn-L').disabled = $('btn-R').disabled = false;
-    card.style.background = c.strike ? '#f1c9b8' : '';
+    card.classList.toggle('strike', !!c.strike);
     card.classList.remove('anim');
     card.style.transform = ''; card.style.opacity = '';
     card.classList.remove('enter'); void card.offsetWidth; card.classList.add('enter');
@@ -164,8 +272,8 @@
     }
     $('money').classList.toggle('ping', !!p.money);
     if (side) {
-      const c = st.current;
-      label.textContent = side === 'L' ? c.L.t : c.R.t;
+      const v = cardView(st.current);
+      label.textContent = L(side === 'L' ? v.L : v.R);
       label.className = 'choice-label ' + (side === 'L' ? 'left' : 'right');
       label.style.opacity = 1;
     } else {
@@ -180,6 +288,7 @@
     drag = { x: e.clientX, dx: 0, id: e.pointerId };
     card.setPointerCapture(e.pointerId);
     card.classList.remove('anim', 'enter');
+    disarm();
   });
   card.addEventListener('pointermove', e => {
     if (!drag || e.pointerId !== drag.id) return;
@@ -207,12 +316,17 @@
     card.classList.add('anim');
     card.style.transform = `translateX(${side === 'L' ? -26 : 26}px) rotate(${side === 'L' ? -4 : 4}deg)`;
     setPreview(side);
-    toast('한 번 더 누르면 확정');
+    SFX.play('tap');
+    toast(t('한 번 더 누르면 확정'));
   }));
-  // 키보드
+  // 키보드 (버튼에 포커스가 있으면 브라우저 기본 동작에 맡겨 두 번 눌리지 않게)
   document.addEventListener('keydown', e => {
-    if (!$('s-game').classList.contains('active')) return;
-    if (!$('result').hidden && (e.key === 'Enter' || e.key === ' ')) { $('btn-next').click(); return; }
+    if (!$('s-game').classList.contains('active') || e.repeat) return;
+    const onButton = e.target && e.target.tagName === 'BUTTON';
+    if (!$('result').hidden && (e.key === 'Enter' || e.key === ' ')) {
+      if (!onButton) { e.preventDefault(); $('btn-next').click(); }
+      return;
+    }
     if (e.key === 'ArrowLeft') $('btn-L').click();
     if (e.key === 'ArrowRight') $('btn-R').click();
   });
@@ -227,7 +341,9 @@
     card.style.transform = `translateX(${side === 'L' ? -140 : 140}%) rotate(${side === 'L' ? -24 : 24}deg)`;
     card.style.opacity = 0;
     const res = D7.choose(st, side);
+    SFX.play('swipe');
     if (navigator.vibrate) try { navigator.vibrate(12); } catch (e) { /* 무시 */ }
+    if (st.over) clearSave(); else saveGame();
     setTimeout(() => after(res), 260);
   }
 
@@ -241,73 +357,89 @@
     return out.length ? `<div class="deltas">${out.join('')}</div>` : '';
   }
 
+  function playFor(res) {
+    if (res.dead) return SFX.play('death');
+    if (res.won) return SFX.play('win');
+    if (res.strike) return SFX.play('strike');
+    if (res.money < 0) SFX.play('coin');
+    const net = Object.values(res.delta).reduce((a, b) => a + b, 0);
+    if (net >= 6) SFX.play('good'); else if (net <= -6) SFX.play('bad');
+    if (res.day) setTimeout(() => SFX.play('day'), 350);
+  }
+
   function after(res) {
     const total = Object.assign({}, res.delta);
     if (res.day) for (const k in res.day.decay) total[k] = (total[k] || 0) + res.day.decay[k];
-    renderHud(total);
-    renderItems(res.added);
+    renderHud(total, res.added);
+    playFor(res);
     if (res.won || res.dead) {
       saveRecord(st);
       setTimeout(() => ending(res), res.dead ? 650 : 300);
       return;
     }
     const parts = [];
-    if (res.msgs.length) parts.push(res.msgs.map(m => `<p class="${m.startsWith('✔') ? 'ok' : ''}">${m}</p>`).join(''));
-    if (res.added.length) parts.push(`<p class="ok">획득: ${res.added.map(i => ITEMS[i].icon + ' ' + ITEMS[i].name).join(', ')}</p>`);
-    if (res.cashAdded) parts.push(`<p class="ok">💵 현금 ${money(res.cashAdded)} 인출 (지갑 ${money(st.cash)})</p>`);
-    const showDelta = res.msgs.length || res.added.length;
-    if (showDelta) parts.push(chips(res.delta, res.money));
+    if (res.msgs.length) parts.push(res.msgs.map(m => `<p class="${m.ok ? 'ok' : ''}">${m.ok ? '✔ ' : ''}${msgText(m)}</p>`).join(''));
+    const bought = res.added.filter(i => !(res.day && res.day.delivered.includes(i)));
+    if (bought.length) parts.push(`<p class="ok">${t('획득')}: ${bought.map(itemName).join(', ')}</p>`);
+    if (res.cashAdded) parts.push(`<p class="ok">💵 ${tv('현금 {a} 인출 (지갑 {b})', { a: money(res.cashAdded), b: money(st.cash) })}</p>`);
+    if (res.msgs.length || bought.length) parts.push(chips(res.delta, res.money));
     if (res.day) {
       const isDday = res.day.label === 'D-Day';
-      const decay = chips(res.day.decay, 0);
-      parts.push(`<div class="newday"><h4>${isDday ? '⚠️ ' : '🌅 '}${res.day.label}</h4>
-        <p>${isDday ? '오늘이다. 준비한 만큼 버틴다.' : st.day >= 1 ? '하루가 지났다. 버티는 데만 이만큼 들었다.' : '대비할 시간이 하루 줄었다.'}</p>${decay}</div>`);
+      const note = isDday ? t('오늘이다. 준비한 만큼 버틴다.') : st.day >= 1 ? t('하루가 지났다. 버티는 데만 이만큼 들었다.') : t('대비할 시간이 하루 줄었다.');
+      parts.push(`<div class="newday"><h4>${isDday ? '⚠️ ' : '🌅 '}${res.day.label}</h4><p>${note}</p>
+        ${res.day.msgs.map(m => `<p class="ok">${msgText(m)}</p>`).join('')}${chips(res.day.decay, 0)}</div>`);
     }
     if (!parts.length) { nextCard(); return; }
     $('toast').hidden = true;
     $('result-body').innerHTML = parts.join('');
     $('result').hidden = false;
   }
-  $('btn-next').addEventListener('click', () => { $('result').hidden = true; nextCard(); });
+  $('btn-next').addEventListener('click', () => {
+    if ($('result').hidden) return;
+    $('result').hidden = true;
+    SFX.play('tap');
+    nextCard();
+  });
 
   /* ---------- 엔딩 ---------- */
   function ending(res) {
-    const j = D7.job(st.job), s = D7.scen(st.sc);
+    const j = D7.job(st.job), s = scenView(D7.scen(st.sc));
     const statRow = STATS.map(x => `${x.icon} ${st.stats[x.key]}`).join(' · ');
-    const items = st.items.map(i => ITEMS[i].icon).join(' ') || '없음';
-    const tips = `<div class="box"><h4>실제로 도움이 되는 대비 (${s.name})</h4><ul>${s.tips.map(t => `<li>${t}</li>`).join('')}</ul></div>`;
+    const items = st.items.map(i => ITEMS[i].icon).join(' ') || t('없음');
+    const tips = `<div class="box"><h4>${tv('실제로 도움이 되는 대비 ({sc})', { sc: L(s.name) })}</h4><ul>${s.tips.map(x => `<li>${L(x)}</li>`).join('')}</ul></div>`;
     let head;
     if (st.won) {
       head = `
         <div class="big">🌤️</div>
-        <h2>살아남았다</h2>
-        <p class="sub">${s.endReason}</p>
+        <h2>${t('살아남았다')}</h2>
+        <p class="sub">${L(s.endReason)}</p>
         <div class="grade">${D7.grade(st)}</div>
-        <p class="sub">“${D7.epithet(st)}” · 점수 ${D7.score(st)}</p>`;
+        <p class="sub">“${t(D7.epithet(st))}” · ${tv('점수 {n}', { n: D7.score(st) })}</p>`;
     } else {
       const d = DEATHS[st.death];
       head = `
         <div class="big">${d.icon}</div>
-        <h2>${d.title}</h2>
-        <p class="sub">${d.text}</p>
-        <p class="sub"><b>${D7.dayLabel(st.day)}</b>, ${j.who}(${j.name})의 ${s.name} 생존은 여기까지였다.${res.diedOvernight ? '<br>밤사이 버티지 못했다.' : ''}</p>`;
+        <h2>${t(d.title)}</h2>
+        <p class="sub">${t(d.text)}</p>
+        <p class="sub">${tv('<b>{day}</b>, {who}({job})의 {sc} 생존은 여기까지였다.', { day: D7.dayLabel(st.day), who: t(j.who), job: t(j.name), sc: L(s.name) })}${res.diedOvernight ? '<br>' + t('밤사이 버티지 못했다.') : ''}</p>`;
     }
     $('end-body').innerHTML = `${head}
       <div class="row"><span>${statRow}</span></div>
-      <div class="row"><span>소지품 ${items}</span></div>
-      ${st.karma ? `<div class="row"><span>🤝 남을 도운 횟수 ${st.karma}</span></div>` : ''}
+      <div class="row"><span>${t('소지품')} ${items}</span></div>
+      ${st.karma ? `<div class="row"><span>🤝 ${tv('남을 도운 횟수 {n}', { n: st.karma })}</span></div>` : ''}
       ${tips}
       <div class="btns">
-        <button class="btn primary" id="again">같은 인물로 다시</button>
-        <button class="btn ghost" id="change">다른 인물 선택</button>
+        <button class="btn primary" id="again">${t('같은 인물로 다시')}</button>
+        <button class="btn ghost" id="change">${t('다른 인물 선택')}</button>
+        <button class="btn ghost" id="home">${t('처음으로')}</button>
       </div>`;
-    $('again').addEventListener('click', () => startIntro());
-    $('change').addEventListener('click', () => show('s-job'));
+    $('again').addEventListener('click', () => { SFX.play('tap'); st = null; startIntro(); });
+    $('change').addEventListener('click', () => { SFX.play('tap'); st = null; renderJobs(); show('s-job'); });
+    $('home').addEventListener('click', () => { SFX.play('tap'); st = null; applyStatic(); show('s-title'); });
     show('s-end');
   }
 
-  renderJobs();
-  renderRecords();
+  applyStatic();
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});

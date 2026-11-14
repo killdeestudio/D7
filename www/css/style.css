@@ -174,3 +174,14 @@ h2 { margin: 8px 0 4px; font-size: 22px; letter-spacing: -0.02em; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* 설정 (언어·지역·효과음) */
+.settings { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.seg { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.seg-label { color: var(--mute); font-size: 13px; width: 76px; flex: none; line-height: 1.3; }
+.seg-btn { flex: 1; min-width: 0; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 9px 10px; font-size: 13.5px; cursor: pointer; line-height: 1.3; }
+.seg-btn.on { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.icon-btn { flex: none; width: 34px; height: 34px; border-radius: 10px; border: 0; background: #20242c; font-size: 16px; cursor: pointer; }
+.intro .note { margin-top: 8px; color: var(--mute); font-size: 14px; }
+.card.strike { background: #f1c9b8; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

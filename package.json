@@ -5,7 +5,8 @@
   "description": "D-7 재난 생존 — Reigns 스타일 카드 스와이프 재난 대비 시뮬레이션 (Android/iOS)",
   "scripts": {
     "start": "npx --yes http-server www -p 8080 -c-1",
-    "test": "node --test tests/engine.test.js",
+    "test": "node --test tests/engine.test.js tests/i18n.test.js",
+    "i18n": "node tools/build-i18n.js",
     "balance": "node tests/simulate.js 1000",
     "cap:add:android": "npx cap add android",
     "cap:add:ios": "npx cap add ios",
