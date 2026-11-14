@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#121419">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="D-7">
+  <meta name="description" content="재난 7일 전, 당신은 무엇을 준비하겠습니까? 카드를 넘기며 살아남는 재난 생존 시뮬레이션.">
+  <title>D-7 재난 생존</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- 타이틀 -->
+    <section id="s-title" class="screen active">
+      <div class="title-wrap">
+        <div class="logo">D<span>-</span>7</div>
+        <p class="tag">재난 7일 전.<br>당신은 무엇을 준비하겠습니까?</p>
+        <button class="btn primary" data-go="s-job">시작하기</button>
+        <button class="btn ghost" id="btn-how">플레이 방법</button>
+        <div id="records" class="records"></div>
+      </div>
+    </section>
+
+    <!-- 플레이 방법 -->
+    <section id="s-how" class="screen">
+      <div class="page">
+        <h2>플레이 방법</h2>
+        <ol class="how">
+          <li>카드를 <b>왼쪽·오른쪽으로 밀어</b> 선택합니다. 버튼을 한 번 누르면 미리보기, 한 번 더 누르면 확정.</li>
+          <li>카드를 기울이면 위쪽 능력치에 <b>점</b>이 보입니다. 큰 점일수록 크게 변합니다. 오를지 내릴지는 모릅니다.</li>
+          <li>❤️건강 🧠정신력 🥫물자 🛡️안전 — <b>하나라도 0이 되면</b> 끝입니다.</li>
+          <li><b>D-7 ~ D-1</b>은 대비 기간. 돈으로 물건을 사고 사람들과 관계를 쌓으세요.</li>
+          <li><b>D-Day</b>에 재난이 닥칩니다. 결제망이 멈추면 <b>미리 뽑아둔 현금</b>만 쓸 수 있습니다.</li>
+          <li>재난 후엔 매일 물자와 기력이 줄어듭니다. 복구되는 날까지 버티세요.</li>
+        </ol>
+        <button class="btn primary" data-go="s-title">알겠어요</button>
+      </div>
+    </section>
+
+    <!-- 직업 선택 -->
+    <section id="s-job" class="screen">
+      <div class="page">
+        <h2>누구로 살아남을까?</h2>
+        <div id="job-list" class="pick-list"></div>
+        <button class="btn ghost" data-go="s-title">뒤로</button>
+      </div>
+    </section>
+
+    <!-- 재난 선택 -->
+    <section id="s-sc" class="screen">
+      <div class="page">
+        <h2>어떤 재난이 올까?</h2>
+        <div id="sc-list" class="pick-list"></div>
+        <button class="btn ghost" data-go="s-job">뒤로</button>
+      </div>
+    </section>
+
+    <!-- 인트로 -->
+    <section id="s-intro" class="screen">
+      <div class="page intro">
+        <div id="intro-body"></div>
+        <button class="btn primary" id="btn-begin">D-7 시작</button>
+      </div>
+    </section>
+
+    <!-- 게임 -->
+    <section id="s-game" class="screen">
+      <header class="hud">
+        <div class="stats" id="stats"></div>
+        <div class="hud-row">
+          <div class="day" id="day"></div>
+          <div class="money" id="money"></div>
+        </div>
+        <div class="timeline"><div class="tl-fill" id="tl-fill"></div><div class="tl-dday" id="tl-dday"></div></div>
+      </header>
+
+      <main class="table">
+        <p class="prompt" id="prompt"></p>
+        <div class="deck" id="deck">
+          <div class="card-back"></div>
+          <div class="card" id="card">
+            <div class="choice-label" id="choice-label"></div>
+            <div class="portrait" id="portrait"></div>
+            <div class="who" id="who"></div>
+          </div>
+        </div>
+        <div class="choices">
+          <button class="choice-btn" id="btn-L"></button>
+          <button class="choice-btn" id="btn-R"></button>
+        </div>
+      </main>
+
+      <footer class="foot">
+        <div class="me" id="me"></div>
+        <div class="items" id="items"></div>
+      </footer>
+
+      <div class="result" id="result" hidden>
+        <div class="result-box">
+          <div id="result-body"></div>
+          <button class="btn primary" id="btn-next">계속</button>
+        </div>
+      </div>
+      <div class="toast" id="toast" hidden></div>
+    </section>
+
+    <!-- 엔딩 -->
+    <section id="s-end" class="screen">
+      <div class="page end" id="end-body"></div>
+    </section>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>
