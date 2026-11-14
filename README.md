@@ -2,6 +2,8 @@
 
 > 재난 7일 전. 당신은 무엇을 준비하겠습니까?
 
+개발: **Killdee Studio**
+
 카드를 좌우로 넘기며 선택하는 (Reigns 방식) 재난 대비·생존 시뮬레이션입니다.
 D-7부터 대비하고, D-Day에 재난을 맞고, 복구되는 날까지 버티면 승리합니다.
 게임 끝에는 해당 재난의 **실제 대비 요령**을 보여줍니다.
@@ -102,7 +104,7 @@ npm start
 
 ## 안드로이드 앱
 
-`android/` 폴더가 Capacitor로 만든 안드로이드 프로젝트입니다 (앱 ID `com.d7survival.app`, 세로 고정, 최소 Android 7.0 / 대상 SDK 36).
+`android/` 폴더가 Capacitor로 만든 안드로이드 프로젝트입니다 (앱 ID `com.killdeestudio.d7`, 세로 고정, 최소 Android 7.0 / 대상 SDK 36).
 
 ### 1. 컴퓨터 없이 APK 받기 (GitHub Actions)
 
@@ -131,6 +133,14 @@ keytool -genkeypair -v -keystore d7-upload.jks -alias d7 -keyalg RSA -keysize 20
    - 새 개인 개발자 계정은 출시 전 테스터 12명 × 14일 비공개 테스트가 필요할 수 있습니다.
 
 키스토어 파일(`*.jks`)은 저장소에 절대 커밋하지 마세요 (`.gitignore`에 포함).
+
+### 개인정보처리방침 (Play 등록 필수)
+
+`docs/privacy.html`에 한/영 방침이 있습니다. 게임은 데이터를 수집하지 않고, 기기 안에만 저장합니다.
+1. `[contact email]` / `[연락 이메일]` 자리에 게임용 연락 이메일을 넣습니다.
+2. GitHub 저장소 → Settings → Pages → Source: `Deploy from a branch`, 브랜치 `main`, 폴더 `/docs` → Save.
+3. 몇 분 뒤 `https://<계정>.github.io/<저장소>/privacy.html` 주소를 Play Console의 개인정보처리방침 칸에 넣습니다.
+   - GitHub 무료 계정은 Pages를 쓰려면 저장소가 공개여야 합니다. 비공개로 두려면 방침만 별도 공개 저장소에 올리세요.
 
 ### 3. 내 컴퓨터에서 빌드 (선택)
 

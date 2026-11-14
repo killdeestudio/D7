@@ -1,4 +1,4 @@
-package com.getcapacitor.myapp;
+package com.killdeestudio.d7;
 
 import static org.junit.Assert.*;
 

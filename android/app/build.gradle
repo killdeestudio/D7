@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.d7survival.app"
+    namespace = "com.killdeestudio.d7"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.d7survival.app"
+        applicationId "com.killdeestudio.d7"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI에서 빌드 번호를 올려준다 (Google Play는 업로드마다 versionCode가 커야 함)

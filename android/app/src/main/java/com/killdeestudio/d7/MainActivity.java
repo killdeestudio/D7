@@ -1,4 +1,4 @@
-package com.d7survival.app;
+package com.killdeestudio.d7;
 
 import com.getcapacitor.BridgeActivity;
 
